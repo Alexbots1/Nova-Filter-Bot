@@ -259,6 +259,15 @@ class Database:
     async def set_fsub(self, channels: str):
         await self.stg.update_one({'id': BOT_ID}, {'$set': {'FORCE_SUB_CHANNELS': channels}}, upsert=True)
 
+    async def get_video_cover(self):
+        stg = await self.stg.find_one({'id': BOT_ID})
+        if not stg:
+            return None
+        return stg.get('VIDEO_COVER', None)
+
+    async def set_video_cover(self, url: str):
+        await self.stg.update_one({'id': BOT_ID}, {'$set': {'VIDEO_COVER': url}}, upsert=True)
+
     async def get_req_fsub(self):
         stg = await self.stg.find_one({'id': BOT_ID})
         if not stg:

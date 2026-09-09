@@ -109,6 +109,7 @@ class script(object):
 • 📑 /index_channels - Indexed channels
 • 🗑️ /delete - Delete files by query
 • 💥 /delete_all - Wipe indexed DB
+• 🌌 /set_video_cover - Set the photo to the video files
 
 <b>📢 Broadcast & Groups</b>
 • 📢 /broadcast - PM broadcast

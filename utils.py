@@ -355,7 +355,7 @@ def get_readable_time(seconds):
         if seconds >= period_seconds:
             period_value, seconds = divmod(seconds, period_seconds)
             result += f'{int(period_value)}{period_name}'
-    return result
+    return '-' if result == '' else result
 
 def get_wish():
     time = datetime.now(pytz.timezone(TIME_ZONE))

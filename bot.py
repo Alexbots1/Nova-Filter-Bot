@@ -126,7 +126,10 @@ class Bot(Client):
         except:
             logger.error("Make sure bot admin in LOG_CHANNEL, exiting now")
             exit()
-        logger.info(f"Bot [@{me.username}] and webapp [{URL}] is started now ✓")
+        txt = f"Bot [@{me.username}] started..!"
+        if URL:
+            txt = f"Bot [@{me.username}] and webapp [{URL}] is started..!"
+        logger.info(txt)
 
     async def stop(self, **kwargs):
         await super().stop()

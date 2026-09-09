@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 from info import REQUESTS_CHANNEL, PREMIUM_PLANS, EFFECT_IDS, OWNER_USERNAME, IS_PREMIUM, URL, BIN_CHANNEL, SECOND_FILES_DATABASE_URL, INDEX_CHANNELS, ADMINS, IS_VERIFY, VERIFY_TUTORIAL, VERIFY_EXPIRE, SHORTLINK_API, SHORTLINK_URL, DELETE_TIME, SUPPORT_LINK, UPDATES_LINK, LOG_CHANNEL, PICS, IS_STREAM, REACTIONS, PM_FILE_DELETE_TIME
 from utils import get_plan_name, get_poster, is_premium, upload_image, get_settings, get_size, is_subscribed, is_check_admin, get_shortlink, get_verify_status, update_verify_status, save_group_settings, temp, get_readable_time, get_wish, get_seconds, render_list_page
 import PTN
-
+from pyrogram.file_id import FileId
 
 
 @Client.on_message(filters.command("repair_mode") & filters.incoming & filters.user(ADMINS))
@@ -193,13 +193,22 @@ async def start(client, message):
                     InlineKeyboardButton("✖️ Close", callback_data="close_data")
                 ]]
 
-            msg = await client.send_cached_media(
-                chat_id=message.from_user.id,
-                file_id=file['_id'],
-                caption=f_caption,
-                protect_content=False,
-                reply_markup=InlineKeyboardMarkup(btn)
-            )
+            if (FileId.decode(file['_id'])).file_type == 4:
+                msg = await client.send_video(
+                    chat_id=message.from_user.id,
+                    video=file['_id'],
+                    caption=f_caption,
+                    reply_markup=InlineKeyboardMarkup(btn),
+                    video_cover=await db.get_video_cover()
+                )
+            else:
+                msg = await client.send_cached_media(
+                    chat_id=message.from_user.id,
+                    file_id=file['_id'],
+                    caption=f_caption,
+                    protect_content=False,
+                    reply_markup=InlineKeyboardMarkup(btn)
+                )
             file_ids.append(msg.id)
             await asyncio.sleep(2)
 
@@ -258,13 +267,22 @@ async def start(client, message):
         ],[
             InlineKeyboardButton("✖️ Close", callback_data="close_data")
         ]]
-    vp = await client.send_cached_media(
-        chat_id=message.from_user.id,
-        file_id=file_id,
-        caption=f_caption,
-        protect_content=False,
-        reply_markup=InlineKeyboardMarkup(btn)
-    )
+    if (FileId.decode(file_id)).file_type == 4:
+        vp = await client.send_video(
+            chat_id=message.from_user.id,
+            video=file_id,
+            caption=f_caption,
+            reply_markup=InlineKeyboardMarkup(btn),
+            video_cover=await db.get_video_cover()
+        )
+    else:
+        vp = await client.send_cached_media(
+            chat_id=message.from_user.id,
+            file_id=file_id,
+            caption=f_caption,
+            protect_content=False,
+            reply_markup=InlineKeyboardMarkup(btn)
+        )
     time = get_readable_time(PM_FILE_DELETE_TIME)
     msg = await vp.reply(f"⚠️ <b>Note:</b> This file will be auto-deleted in <b>{time}</b> to prevent copyright infringement. Please forward or download it immediately!")
     await asyncio.sleep(PM_FILE_DELETE_TIME)
@@ -310,11 +328,7 @@ async def link(bot, message):
         bin_msg = await bot.send_cached_media(chat_id=BIN_CHANNEL, file_id=media.file_id)
         watch = f"{URL}watch/{bin_msg.id}"
         download = f"{URL}download/{bin_msg.id}"
-        f_id_str = str(media._id)
-        user_watchlist = await db.get_watchlist(message.from_user.id)
-        user_favorites = await db.get_favorites(message.from_user.id)
-        watch_btn = InlineKeyboardButton("🗑️ Remove Watchlist", callback_data=f"del_watch#{f_id_str}") if f_id_str in user_watchlist else InlineKeyboardButton("🔖 Add Watchlist", callback_data=f"add_watch#{f_id_str}")
-        fav_btn = InlineKeyboardButton("💔 Remove Favorites", callback_data=f"del_fav#{f_id_str}") if f_id_str in user_favorites else InlineKeyboardButton("❤️ Add Favorites", callback_data=f"add_fav#{f_id_str}")
+
         btn = []
         if vidking_url:
             btn.append([
@@ -323,9 +337,6 @@ async def link(bot, message):
         btn.append([
             InlineKeyboardButton("🎬 Watch Online", url=watch),
             InlineKeyboardButton("⚡ Fast Download", url=download)
-        ])
-        btn.append([
-            watch_btn, fav_btn
         ])
         btn.append([
             InlineKeyboardButton('✖️ Close', callback_data='close_data')
@@ -445,6 +456,27 @@ async def delete_file(bot, message):
     await message.reply_text(f"🗑️ <b>Delete Confirmation</b>\n\nAre you sure you want to delete all files matching: <code>{query}</code> from the database?", reply_markup=InlineKeyboardMarkup(btn))
  
 
+@Client.on_message(filters.command('set_video_cover') & filters.user(ADMINS))
+async def set_video_cover(bot, message):
+    reply_to_message = message.reply_to_message
+    if not reply_to_message:
+        return await message.reply('⚠️ <b>Missing Photo Reply!</b>\n\n<blockquote>Please reply to an image to set as video cover</blockquote>')
+    file = reply_to_message.photo
+    if file is None:
+        return await message.reply('❌ <b>Invalid Media!</b>\n\n<blockquote>Please reply to a valid photo or PNG/JPG image.</blockquote>')
+    text = await message.reply_text(text="🔄 Processing....")   
+    path = await reply_to_message.download()  
+    response = upload_image(path)
+    if not response:
+        await text.edit_text(text="❌ <b>Upload Failed!</b>\n\n<blockquote>Could not upload image to as video cover. Please try again.</blockquote>")
+        return    
+    try:
+        os.remove(path)
+    except:
+        pass
+    await db.set_video_cover(response)
+    await text.edit_text("🎉 Successfully set the video cover.")
+
 
 @Client.on_message(filters.command('img_2_link'))
 async def img_2_link(bot, message):
@@ -458,13 +490,14 @@ async def img_2_link(bot, message):
     path = await reply_to_message.download()  
     response = upload_image(path)
     if not response:
-         await text.edit_text(text="❌ <b>Upload Failed!</b>\n\n<blockquote>Could not upload image to Telegraph. Please try again.</blockquote>")
-         return    
+        await text.edit_text(text="❌ <b>Upload Failed!</b>\n\n<blockquote>Could not upload image to Telegraph. Please try again.</blockquote>")
+        return    
     try:
         os.remove(path)
     except:
         pass
     await text.edit_text(f"<b>❤️ Your link ready 👇\n\n{response}</b>", link_preview_options=LinkPreviewOptions(is_disabled=True))
+
 
 @Client.on_message(filters.command('ping'))
 async def ping(client, message):
